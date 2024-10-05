@@ -2,9 +2,15 @@
 
 Este é um jogo simples em HTML e JavaScript onde o jogador controla uma Nave, evitando obstáculos e coletando pontos. O jogo utiliza gráficos em linha para manter um estilo minimalista e divertido.
 
+## Como Jogar
+
+- Use as teclas de seta para mover a nave.
+- Tente sobreviver o maior tempo possível sem colidir com os asteroides.
+
 ## Demonstração
 
-![Demo do jogo](link_para_sua_imagem_de_demo.png)
+O jogo pode ser jogado diretamente aqui: [Asteroid Game](https://flamoedo.github.io/asteroid/).
+
 
 ## Tecnologias Utilizadas
 
