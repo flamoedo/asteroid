@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroids Game</title>
+    <style>
+        canvas {
+            background: black;
+            display: block;
+            margin: 0 auto;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+		
+		// Carregar sons
+        const shootSound = new Audio('shoot.mp3');
+        const explosionSound = new Audio('explosion.mp3');
+
+
+        let ship = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            angle: 0,
+            speed: 0,
+            rotation: 0,
+            velocity: { x: 0, y: 0 },
+            size: 20,
+            lives: 3,
+            isAlive: true,
+            canShoot: true,
+            shootCooldown: 500 // 500ms entre disparos
+        };
+
+		let ufo = {
+            x: Math.random() * canvas.width / 2, // UFO começa em uma posição aleatória
+            y: Math.random() * canvas.height / 2,
+            velocity: { x: Math.random() * 2 - 1, y: Math.random() * 2 - 1 },
+            size: 40,
+        };
+
+
+        let bullets = [];
+        let asteroids = [];
+        //let ufo = null; // Disco voador
+        let ufoBullets = [];
+        let keys = {};
+        let lastShotTime = 0;
+        let score = 0;
+        let ufoSpawnInterval = 10000; // 10 segundos
+        let ufoLastSpawnTime = 0;
+
+        // Função para criar asteroides de tamanhos e formas irregulares
+        function createAsteroids(num) {
+            for (let i = 0; i < num; i++) {
+                let asteroid = {
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    velocity: {
+                        x: Math.random() * 4 - 2,
+                        y: Math.random() * 4 - 2
+                    },
+                    size: Math.random() * 30 + 30, // Tamanhos maiores para se dividir
+                    vertices: Math.floor(Math.random() * 5 + 5), // De 5 a 10 vértices
+                    offset: Array.from({length: Math.floor(Math.random() * 5 + 5)}, () => Math.random() * 0.4 + 0.8) // Irregularidade nas bordas
+                };
+                asteroids.push(asteroid);
+            }
+        }
+
+        // Função para desenhar a nave
+        function drawShip() {
+            if (ship.isAlive) {
+                ctx.save();
+                ctx.translate(ship.x, ship.y);
+                ctx.rotate(ship.angle);
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(ship.size, 0);
+                ctx.lineTo(-ship.size, ship.size / 2);
+                ctx.lineTo(-ship.size, -ship.size / 2);
+                ctx.closePath();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Função para desenhar asteroides irregulares
+        function drawAsteroids() {
+            asteroids.forEach(asteroid => {
+                ctx.save();
+                ctx.translate(asteroid.x, asteroid.y);
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+
+                for (let i = 0; i < asteroid.vertices; i++) {
+                    let angle = (Math.PI * 2 / asteroid.vertices) * i;
+                    let distance = asteroid.size * asteroid.offset[i % asteroid.vertices];
+                    let x = Math.cos(angle) * distance;
+                    let y = Math.sin(angle) * distance;
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.closePath();
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
+
+	 // Função para desenhar o placar e as vidas
+			function drawScoreAndLives() {
+				ctx.fillStyle = 'white'; // Cor do texto
+				ctx.font = '24px Arial';
+				ctx.fillText(`Score: ${score}`, 20, 40); // Desenha o placar
+				ctx.fillText(`Lives: ${ship.lives}`, 20, 70); // Desenha as vidas restantes
+			}
+
+        // Função para desenhar balas
+        function drawBullets() {
+            bullets.forEach(bullet => {
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+/*
+        // Função para desenhar o disco voador
+        function drawUFO() {
+            if (ufo) {
+                ctx.save();
+                ctx.translate(ufo.x, ufo.y);
+                
+				ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-20, -10, 40, 20); // Forma básica de UFO
+				
+				// Desenha a base do UFO
+            ctx.strokeStyle = 'white';
+            ctx.fillStyle = 'gray';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, ufo.size * 1.5, ufo.size, 0, 0, Math.PI * 2);
+            //ctx.fill();
+            ctx.stroke();
+
+            // Desenha a cúpula do UFO
+            ctx.fillStyle = 'lightblue';
+            ctx.beginPath();
+            ctx.ellipse(0, -ufo.size * 0.5, ufo.size * 0.8, ufo.size * 0.5, 0, 0, Math.PI * 2);
+            //ctx.fill();
+            ctx.stroke();
+				
+				
+                ctx.restore();
+            }
+        }
+		*/
+		
+		function drawUFO() {
+            if (ufo) {
+                ctx.save();
+                ctx.translate(ufo.x, ufo.y);
+                //ctx.rotate(ship.angle);
+
+                // Desenha a base do ship
+                ctx.strokeStyle = 'white';
+                ctx.fillStyle = 'gray';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, ship.size * 1.5, ship.size, 0, 0, Math.PI * 2);
+                //ctx.fill();
+                ctx.stroke();
+
+                // Desenha a cúpula do ship
+                ctx.fillStyle = 'lightblue';
+                ctx.beginPath();
+                ctx.ellipse(0, -ship.size * 0.5, ship.size * 0.8, ship.size * 0.5, 0, 0, Math.PI * 2);
+                //ctx.fill();
+                ctx.stroke();
+
+                // Desenha as luzes ao redor da base do ship
+                for (let i = 0; i < 360; i += 45) {
+                    ctx.beginPath();
+                    const angle = i * (Math.PI / 180);
+                    const lightX = Math.cos(angle) * ship.size * 1.5;
+                    const lightY = Math.sin(angle) * ship.size * 1.0;
+                    ctx.arc(lightX, lightY, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = 'yellow';
+                    //ctx.fill();
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+        }
+		
+		
+		/*
+		function drawUFO() {
+    if (ufo) {
+        ctx.save();
+        ctx.translate(ufo.x, ufo.y);
+        // ctx.rotate(ship.angle);
+
+        // Desenha a base do UFO (disco)
+        ctx.strokeStyle = 'white';
+        ctx.fillStyle = 'gray';
+        ctx.beginPath();
+        ctx.moveTo(-ship.size * 1.5, 0); // Ponto esquerdo
+        ctx.lineTo(ship.size * 1.5, 0);  // Ponto direito
+        ctx.lineTo(ship.size * 1.2, ship.size * 0.5); // Ponto inferior direito
+        ctx.lineTo(-ship.size * 1.2, ship.size * 0.5); // Ponto inferior esquerdo
+        ctx.closePath();
+        ctx.stroke();
+
+        // Desenha a cúpula do UFO
+        ctx.fillStyle = 'lightblue';
+        ctx.beginPath();
+        ctx.moveTo(-ship.size * 0.8, -ship.size * 0.5); // Ponto esquerdo da cúpula
+        ctx.lineTo(0, -ship.size * 1.0);  // Ponto superior da cúpula
+        ctx.lineTo(ship.size * 0.8, -ship.size * 0.5); // Ponto direito da cúpula
+        ctx.closePath();
+        ctx.stroke();
+
+        // Desenha as luzes ao redor da base do UFO
+        for (let i = 0; i < 360; i += 45) {
+            ctx.beginPath();
+            const angle = i * (Math.PI / 180);
+            const lightX = Math.cos(angle) * ship.size * 1.5;
+            const lightY = Math.sin(angle) * ship.size * 1.0;
+            ctx.moveTo(lightX, lightY); // Ponto da luz
+            ctx.lineTo(lightX, lightY + 15); // Linha da luz
+            ctx.strokeStyle = 'yellow';
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+}
+*/
+		
+		
+        // Função para desenhar balas do disco voador
+        function drawUFOBullets() {
+            ufoBullets.forEach(bullet => {
+                ctx.fillStyle = 'red';
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Função para atualizar posição da nave
+        function updateShip() {
+            if (ship.isAlive) {
+                ship.angle += ship.rotation;
+                ship.velocity.x += Math.cos(ship.angle) * ship.speed;
+                ship.velocity.y += Math.sin(ship.angle) * ship.speed;
+                ship.x += ship.velocity.x;
+                ship.y += ship.velocity.y;
+
+                // Teletransporte da nave (se atravessar os limites da tela)
+                if (ship.x > canvas.width) ship.x = 0;
+                if (ship.x < 0) ship.x = canvas.width;
+                if (ship.y > canvas.height) ship.y = 0;
+                if (ship.y < 0) ship.y = canvas.height;
+            }
+        }
+
+        // Função para atualizar balas
+        function updateBullets() {
+            bullets.forEach((bullet, index) => {
+                bullet.x += bullet.velocity.x;
+                bullet.y += bullet.velocity.y;
+
+                // Remover bala se sair dos limites da tela
+                if (bullet.x > canvas.width || bullet.x < 0 || bullet.y > canvas.height || bullet.y < 0) {
+                    bullets.splice(index, 1);
+                }
+            });
+        }
+
+        // Função para atualizar asteroides
+        function updateAsteroids() {
+            asteroids.forEach(asteroid => {
+                asteroid.x += asteroid.velocity.x;
+                asteroid.y += asteroid.velocity.y;
+
+                if (asteroid.x > canvas.width) asteroid.x = 0;
+                if (asteroid.x < 0) asteroid.x = canvas.width;
+                if (asteroid.y > canvas.height) asteroid.y = 0;
+                if (asteroid.y < 0) asteroid.y = canvas.height;
+            });
+        }
+
+        // Função para spawnar o disco voador
+        function spawnUFO() {
+            ufo = {
+                x: Math.random() < 0.5 ? 0 : canvas.width,
+                y: Math.random() * canvas.height,
+                velocity: { x: Math.random() * 4 - 2, y: Math.random() * 4 - 2 }
+            };
+        }
+
+        // Função para mover o disco voador
+        function updateUFO() {
+            if (ufo) {
+                ufo.x += ufo.velocity.x;
+                ufo.y += ufo.velocity.y;
+
+                if (ufo.x > canvas.width) ufo.x = 0;
+                if (ufo.x < 0) ufo.x = canvas.width;
+                if (ufo.y > canvas.height) ufo.y = 0;
+                if (ufo.y < 0) ufo.y = canvas.height;
+            }
+        }
+
+        // Função para atirar no UFO
+        function shootUFO() {
+            if (ufo) {
+                const bullet = {
+                    x: ufo.x,
+                    y: ufo.y,
+                    velocity: {
+                        x: Math.cos(Math.atan2(ship.y - ufo.y, ship.x - ufo.x)) * 5,
+                        y: Math.sin(Math.atan2(ship.y - ufo.y, ship.x - ufo.x)) * 5
+                    }
+                };
+                ufoBullets.push(bullet);
+            }
+        }
+
+        // Função para atualizar balas do UFO
+        function updateUFOBullets() {
+            ufoBullets.forEach((bullet, index) => {
+                bullet.x += bullet.velocity.x;
+                bullet.y += bullet.velocity.y;
+
+                // Remover bala se sair dos limites da tela
+                if (bullet.x > canvas.width || bullet.x < 0 || bullet.y > canvas.height || bullet.y < 0) {
+                    ufoBullets.splice(index, 1);
+                }
+
+                // Checar colisão com a nave
+                const dist = Math.hypot(bullet.x - ship.x, bullet.y - ship.y);
+                if (dist < ship.size && ship.isAlive) {
+                    ship.isAlive = false;
+                    ship.lives--;
+                    ufoBullets.splice(index, 1);
+                    setTimeout(respawnShip, 2000); // Delay para respawnar
+                }
+            });
+        }
+
+        // Função para respawnar a nave
+        function respawnShip() {
+            if (ship.lives > 0) {
+                ship.x = canvas.width / 2;
+                ship.y = canvas.height / 2;
+                ship.velocity.x = 0;
+                ship.velocity.y = 0;
+                ship.isAlive = true;
+            }
+        }
+
+        // Função para atirar, respeitando o cooldown entre tiros
+        function shootBullet() {
+            if (ship.canShoot && ship.isAlive) {
+                const bullet = {
+                    x: ship.x + Math.cos(ship.angle) * ship.size,
+                    y: ship.y + Math.sin(ship.angle) * ship.size,
+                    velocity: {
+                        x: Math.cos(ship.angle) * 5,
+                        y: Math.sin(ship.angle) * 5
+                    }
+                };
+                bullets.push(bullet);
+                ship.canShoot = false;
+                lastShotTime = Date.now();
+				shootSound.play(); // Toca o som de disparo
+            }
+        }
+
+        // Função para resetar a capacidade de disparar
+        function resetShooting() {
+            if (Date.now() - lastShotTime > ship.shootCooldown) {
+                ship.canShoot = true;
+            }
+        }
+
+        // Função para dividir asteroides grandes ao serem atingidos
+        function splitAsteroid(index) {
+            const asteroid = asteroids[index];
+            if (asteroid.size > 20) {
+                for (let i = 0; i < 2; i++) {
+                    asteroids.push({
+                        x: asteroid.x,
+                        y: asteroid.y,
+                        velocity: {
+                            x: Math.random() * 4 - 2,
+                            y: Math.random() * 4 - 2
+                        },
+                        size: asteroid.size / 2,
+                        vertices: asteroid.vertices,
+                        offset: Array.from({length: asteroid.vertices}, () => Math.random() * 0.4 + 0.8)
+                    });
+                }
+            }
+            asteroids.splice(index, 1); // Remove o asteroide atingido
+        }
+
+
+		function checkUFOCollision() {
+			if (ufo) {
+				bullets.forEach((bullet, bIndex) => {
+					const dist = Math.hypot(bullet.x - ufo.x, bullet.y - ufo.y);
+					if (dist < 20) { // Raio de colisão aproximado do UFO
+						// Remover UFO e bala
+						ufo = null;
+						bullets.splice(bIndex, 1);
+						score += 100; // Opcional: adicionar pontuação
+						explosionSound.play(); // Toca o som de explosão
+						console.log("UFO destruído!");
+					}
+				});
+			}
+		}
+
+        // Função para verificar colisões entre balas e asteroides
+        function checkCollision() {
+            asteroids.forEach((asteroid, aIndex) => {
+                bullets.forEach((bullet, bIndex) => {
+                    const dist = Math.hypot(bullet.x - asteroid.x, bullet.y - asteroid.y);
+                    if (dist < asteroid.size) {
+                        splitAsteroid(aIndex); // Dividir o asteroide ao ser atingido
+                        bullets.splice(bIndex, 1); // Remover bala
+						explosionSound.play(); // Toca o som de explosão
+						score += 10; // Opcional: adicionar pontuação
+                    }
+                });
+
+                // Checar colisão entre asteroides e a nave
+                const distShip = Math.hypot(ship.x - asteroid.x, ship.y - asteroid.y);
+                if (distShip < asteroid.size && ship.isAlive) {
+                    ship.isAlive = false;
+                    ship.lives--;
+                    setTimeout(respawnShip, 2000); // Delay para respawnar
+                }
+            });
+			
+			 // Verificar colisão com o UFO
+			checkUFOCollision();
+        }
+
+        // Loop principal do jogo
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            updateShip();
+            updateBullets();
+            updateAsteroids();
+            updateUFO();
+            updateUFOBullets();
+            checkCollision();
+            resetShooting();
+
+            drawShip();
+            drawBullets();
+            drawAsteroids();
+            drawUFO();
+            drawUFOBullets();
+			drawScoreAndLives(); // Desenha o placar e vidas
+
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Captura de eventos de teclado
+        window.addEventListener('keydown', function (e) {
+            keys[e.code] = true;
+        });
+
+        window.addEventListener('keyup', function (e) {
+            keys[e.code] = false;
+        });
+
+        // Função para controlar a nave e tiros
+        function handleInput() {
+            if (keys['ArrowUp']) {
+                ship.speed = 0.1;
+            } else {
+                ship.speed = 0;
+            }
+
+            if (keys['ArrowLeft']) {
+                ship.rotation = -0.05;
+            } else if (keys['ArrowRight']) {
+                ship.rotation = 0.05;
+            } else {
+                ship.rotation = 0;
+            }
+
+            if (keys['Space']) {
+                shootBullet();
+            }
+        }
+
+        // Função para atualizar controles
+        function gameUpdate() {
+            handleInput();
+            if (Date.now() - ufoLastSpawnTime > ufoSpawnInterval) {
+                spawnUFO();
+                ufoLastSpawnTime = Date.now();
+                setInterval(shootUFO, 5000); // UFO atira a cada 1 segundo
+            }
+            requestAnimationFrame(gameUpdate);
+        }
+
+        // Inicialização do jogo
+        createAsteroids(5);
+        gameLoop();
+        gameUpdate();
+    </script>
+</body>
+</html>
