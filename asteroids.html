@@ -434,6 +434,7 @@
 		function checkUFOCollision() {
 			if (ufo) {
 				bullets.forEach((bullet, bIndex) => {
+					if(ufo){
 					const dist = Math.hypot(bullet.x - ufo.x, bullet.y - ufo.y);
 					if (dist < 20) { // Raio de colisão aproximado do UFO
 						// Remover UFO e bala
@@ -442,6 +443,7 @@
 						score += 100; // Opcional: adicionar pontuação
 						explosionSound.play(); // Toca o som de explosão
 						console.log("UFO destruído!");
+						}
 					}
 				});
 			}
