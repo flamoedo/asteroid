@@ -1,4 +1,4 @@
-# UFO Game
+# Asteroid Game
 
 Este é um jogo simples em HTML e JavaScript onde o jogador controla uma Nave, evitando obstáculos e coletando pontos. O jogo utiliza gráficos em linha para manter um estilo minimalista e divertido.
 
